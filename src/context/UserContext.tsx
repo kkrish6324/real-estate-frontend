@@ -15,6 +15,33 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | null>(null);
 
+/** Set only after explicit login/register in this tab — not when /users/me succeeds via cookie alone. */
+const EXPLICIT_SESSION_KEY = "bf_explicit_user_session";
+
+export function hasExplicitUserSession(): boolean {
+  try {
+    return sessionStorage.getItem(EXPLICIT_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markExplicitSession() {
+  try {
+    sessionStorage.setItem(EXPLICIT_SESSION_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearExplicitSession() {
+  try {
+    sessionStorage.removeItem(EXPLICIT_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +57,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    // Avoid session probe on pages that don't need user auth.
+    const needsUserAuth = window.location.pathname.startsWith("/properties/");
+    if (!needsUserAuth) {
+      setLoading(false);
+      return;
+    }
+
     // Restore session via HTTP-only refresh token cookie
     userAuthApi.me()
       .then((data) => setUser(data as UserType))
@@ -41,16 +75,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const data = await userAuthApi.login(email, password) as { token: string; user: UserType };
     tokenStore.setUser(data.token);
     setUser(data.user);
+    markExplicitSession();
   };
 
   const register = async (formData: { name: string; email: string; password: string; phone?: string }) => {
     const data = await userAuthApi.register(formData) as { token: string; user: UserType };
     tokenStore.setUser(data.token);
     setUser(data.user);
+    markExplicitSession();
   };
 
   const logout = () => {
     userAuthApi.logout();
+    clearExplicitSession();
     setUser(null);
   };
 

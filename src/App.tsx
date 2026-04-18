@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminProvider, useAdmin } from "@/context/AdminContext";
-import { UserProvider } from "@/context/UserContext";
+import { UserProvider, useUser, hasExplicitUserSession } from "@/context/UserContext";
 import Index from "./pages/Index.tsx";
 import Properties from "./pages/Properties.tsx";
 import PropertyDetails from "./pages/PropertyDetails.tsx";
@@ -36,6 +36,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const UserProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useUser();
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-muted-foreground">Loading...</div></div>;
+  // Block cookie-only sessions (e.g. old refresh token on production) until user signs in again this tab.
+  if (!hasExplicitUserSession()) {
+    return <Navigate to="/login" replace state={{ from: window.location.pathname + window.location.search }} />;
+  }
+  if (!user) return <Navigate to="/login" replace state={{ from: window.location.pathname + window.location.search }} />;
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -48,7 +59,7 @@ const App = () => (
               {/* Public */}
               <Route path="/" element={<Index />} />
               <Route path="/properties" element={<Properties />} />
-              <Route path="/properties/:id" element={<PropertyDetails />} />
+              <Route path="/properties/:id" element={<UserProtectedRoute><PropertyDetails /></UserProtectedRoute>} />
               <Route path="/blog/:slug" element={<BlogDetails />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />

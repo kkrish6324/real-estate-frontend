@@ -16,6 +16,12 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Avoid admin auth probe on public/user pages.
+    if (!window.location.pathname.startsWith("/admin")) {
+      setLoading(false);
+      return;
+    }
+
     // Try to restore session via refresh token cookie (no localStorage token needed)
     authApi.me()
       .then((data) => setAdmin(data as AdminUser))
